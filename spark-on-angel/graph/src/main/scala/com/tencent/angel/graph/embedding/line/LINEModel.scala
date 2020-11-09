@@ -66,8 +66,8 @@ class LINEModel(dataset: Dataset[_], embeddingDim: Int, negativeNum: Int, stepSi
 
   def train(): Unit = {
     // Original edges
-    var edges:RDD[(String, String)] = null
-    if(dataset.schema.fields(0).dataType == LongType && dataset.schema.fields(1).dataType == LongType) {
+    var edges: RDD[(String, String)] = null
+    if (dataset.schema.fields(0).dataType == LongType && dataset.schema.fields(1).dataType == LongType) {
       edges = dataset.select(srcNodeIdCol, dstNodeIdCol).rdd
         .map(row => (row.getLong(0).toString, row.getLong(1).toString))
         .filter(f => f._1 != f._2)
@@ -552,7 +552,7 @@ class LINEModel(dataset: Dataset[_], embeddingDim: Int, negativeNum: Int, stepSi
     Iterator.single((minId, maxId, numEdges))
   }
 
-  def save(outPath:String, epochNum:Int, saveMeta: Boolean): Unit = {
+  def save(outPath: String, epochNum: Int, saveMeta: Boolean): Unit = {
     psModel.save(outPath, epochNum, saveMeta)
   }
 }
@@ -625,16 +625,18 @@ class LINEWithWightModel(dataset: Dataset[_], embeddingDim: Int, negativeNum: In
 
   override def train(): Unit = {
     // Generate edge table with weight
-    var edges:RDD[(String, String, Float)] = null
-    if(dataset.schema.fields(0).dataType == LongType && dataset.schema.fields(1).dataType == LongType) {
+    var edges: RDD[(String, String, Float)] = null
+    if (dataset.schema.fields(0).dataType == LongType && dataset.schema.fields(1).dataType == LongType) {
       edges =
         dataset.select(srcNodeIdCol, dstNodeIdCol, weightCol).rdd
+          .filter(row => !row.anyNull)
           .map(row => (row.getLong(0).toString, row.getLong(1).toString, row.getFloat(2)))
           .filter(f => f._1 != f._2)
           .filter(f => f._3 != 0)
     } else {
       edges =
         dataset.select(srcNodeIdCol, dstNodeIdCol, weightCol).rdd
+          .filter(row => !row.anyNull)
           .map(row => (row.getString(0), row.getString(1), row.getFloat(2)))
           .filter(f => f._1 != f._2)
           .filter(f => f._3 != 0)

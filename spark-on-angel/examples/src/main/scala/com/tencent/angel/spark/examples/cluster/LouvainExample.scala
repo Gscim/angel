@@ -18,8 +18,8 @@ package com.tencent.angel.spark.examples.cluster
 
 import com.tencent.angel.spark.context.PSContext
 import com.tencent.angel.spark.ml.core.ArgsUtil
-import com.tencent.angel.graph.louvain.Louvain
-import com.tencent.angel.graph.utils.GraphIO
+import com.tencent.angel.graph.community.louvain.Louvain
+import com.tencent.angel.graph.utils.{Delimiter, GraphIO}
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.{SparkConf, SparkContext}
 
@@ -46,15 +46,14 @@ object LouvainExample {
     val enableCheck = params.getOrElse("enableCheck", "false").toBoolean
     val eps = params.getOrElse("eps", "0.0").toDouble
     val bufferSize = params.getOrElse("bufferSize", "1000000").toInt
+    val preserveRate = params.getOrElse("preserveRate", "0.1").toFloat
+    val useMergeStrategy  = params.getOrElse("useMergeStrategy", "true").toBoolean
 
-    val sep = params.getOrElse("sep",  "space") match {
-      case "space" => " "
-      case "comma" => ","
-      case "tab" => "\t"
-    }
+    val sep = Delimiter.parse(params.getOrElse("sep",Delimiter.SPACE))
+
 
     val cpDir = params.get("cpDir").filter(_.nonEmpty).orElse(GraphIO.defaultCheckpointDir)
-    .getOrElse(throw new Exception("checkpoint dir not provided"))
+      .getOrElse(throw new Exception("checkpoint dir not provided"))
     sc.setCheckpointDir(cpDir)
 
     val louvain = new Louvain()
@@ -68,6 +67,8 @@ object LouvainExample {
       .setEps(eps)
       .setBufferSize(bufferSize)
       .setIsWeighted(isWeighted)
+      .setPreserveRate(preserveRate)
+      .setUseMergeStrategy(useMergeStrategy)
 
     val df = GraphIO.load(input, isWeighted = isWeighted,
       srcIndex = srcIndex, dstIndex = dstIndex,

@@ -37,6 +37,7 @@ import scala.collection.mutable.ArrayBuffer
 
 /**
   * A simple neighbor table tool
+  *
   * @param param neighbor table param
   */
 class NeighborTableModel(@BeanProperty val param: Param) extends Serializable {
@@ -56,10 +57,9 @@ class NeighborTableModel(@BeanProperty val param: Param) extends Serializable {
     mc.setPartitionClass(classOf[CSRPartition])
     psMatrix = PSMatrix.matrix(mc)
 
-    data.mapPartitions { iter => {
-        // Init the neighbor table use many mini-batch to avoid big object
-        iter.sliding(param.batchSize, param.batchSize).map(pairs => initNeighbors(psMatrix, pairs))
-      }
+    data.mapPartitions { iter =>
+      // Init the neighbor table use many mini-batch to avoid big object
+      iter.sliding(param.batchSize, param.batchSize).map(pairs => initNeighbors(psMatrix, pairs))
     }.count()
 
     // Merge the temp data to generate final neighbor table
@@ -72,7 +72,7 @@ class NeighborTableModel(@BeanProperty val param: Param) extends Serializable {
     // Group By source node id
     val aggrResult = scala.collection.mutable.Map[Int, ArrayBuffer[Int]]()
     pairs.foreach(pair => {
-      var neighbors:ArrayBuffer[Int] = aggrResult.get(pair._1) match {
+      var neighbors: ArrayBuffer[Int] = aggrResult.get(pair._1) match {
         case None =>
           val temp = new ArrayBuffer[Int]()
           aggrResult += (pair._1 -> temp)
@@ -92,6 +92,12 @@ class NeighborTableModel(@BeanProperty val param: Param) extends Serializable {
     this
   }
 
+  /**
+    * push the neighborsTable to Parameter Server
+    *
+    * @param data
+    * @return
+    */
   def initLongNeighbor(data: RDD[(Long, Array[Long])]): NeighborTableModel = {
     // Neighbor table : a (1, maxIndex + 1) dimension matrix
     val mc: MatrixContext = new MatrixContext()
@@ -101,25 +107,35 @@ class NeighborTableModel(@BeanProperty val param: Param) extends Serializable {
     mc.setColNum(param.maxIndex)
     mc.setMaxColNumInBlock(param.maxIndex / param.psPartNum)
 
+    // the key's value is LongArrayElemnt type
     mc.setValueType(classOf[LongArrayElement])
     psMatrix = PSMatrix.matrix(mc)
 
     data.mapPartitions { iter => {
-        // Init the neighbor table use many mini-batch to avoid big object
-        iter.sliding(param.batchSize, param.batchSize).map(pairs => initLongNeighbors(psMatrix, pairs))
-      }
+      // Init the neighbor table use many mini-batch to avoid big object
+      iter.sliding(param.batchSize, param.batchSize).map(pairs => initLongNeighbors(psMatrix, pairs))
+    }
     }.count()
 
     this
   }
 
+  /**
+    * push the mini-batch neighbors to ps
+    *
+    * @param psMatrix
+    * @param pairs
+    * @return
+    */
   def initLongNeighbors(psMatrix: PSMatrix, pairs: Seq[(Long, Array[Long])]): NeighborTableModel = {
     val nodeIdToNeighbors = new Long2ObjectOpenHashMap[Array[Long]](pairs.length)
     pairs.foreach { case (src, neighbors) =>
       require(src < this.param.maxIndex, s"$src exceeds the maximal node index ${this.param.maxIndex}")
       nodeIdToNeighbors.put(src, neighbors)
     }
+    // create psfunc
     val func = new InitLongNeighbor(new InitLongNeighborParam(psMatrix.id, nodeIdToNeighbors))
+    // it means async push the nodes->neighbors to parameter server
     psMatrix.asyncPsfUpdate(func).get()
     nodeIdToNeighbors.clear()
     println(s"init ${pairs.length} long neighbors")
@@ -137,7 +153,7 @@ class NeighborTableModel(@BeanProperty val param: Param) extends Serializable {
   }
 
   def getLongNeighborsByteAttrs(nodeIds: Array[Long]): Long2ObjectOpenHashMap[NeighborsAttrsCompressedElement] = {
-    psMatrix.psfGet(new GetNeighborWithByteAttr(new GetNeighborWithByteAttrParam(psMatrix.id, nodeIds) ))
+    psMatrix.psfGet(new GetNeighborWithByteAttr(new GetNeighborWithByteAttrParam(psMatrix.id, nodeIds)))
       .asInstanceOf[GetNeighborWithByteAttrResult].getNodeIdToNeighbors
   }
 

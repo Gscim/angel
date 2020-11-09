@@ -14,6 +14,7 @@
  * the License.
  *
  */
+
 package com.tencent.angel.graph.embedding.line
 
 import java.util
@@ -122,7 +123,7 @@ class LINEAdjustParam(matrixId: Int, inputUpdates: Int2ObjectOpenHashMap[Array[F
         val inputNodeIds = inputUpdates.keySet().toIntArray
         val indicesViews = RowUpdateSplitUtils.split(inputNodeIds, parts, false)
 
-        if(partToParams == null) {
+        if (partToParams == null) {
           partToParams = new util.HashMap[PartitionKey, PartitionUpdateParam]()
         }
 
